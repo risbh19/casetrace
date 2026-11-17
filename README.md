@@ -1,10 +1,37 @@
-# Investigation Copilot
+<div align="center">
+
+# CaseTrace
+
+**Follow the evidence, trace the transfers and review every next step.**
 
 A self-hosted training workspace for an online financial fraud investigation. Officers can review synthetic evidence, query a section-level legal library, track a checklist and deadlines, trace transfers, and record supervisory approval of a draft notice.
 
+![Python](https://img.shields.io/badge/Python-334155?style=flat-square)
+![FastAPI](https://img.shields.io/badge/FastAPI-334155?style=flat-square)
+![React](https://img.shields.io/badge/React-334155?style=flat-square)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-334155?style=flat-square)
+
+[Quick start](#quick-start) · [Testing](#testing) · [Scope](#scope)
+
+</div>
+
+---
+
 ![Money trail in the synthetic training workspace](docs/screenshots/money-trail.png)
 
-## Run with Docker
+## The problem
+
+A financial-fraud case brings together documents, transaction records, legal references and follow-up dates. CaseTrace organises those records around a synthetic case so an officer can review evidence and prepare the next steps in one workspace.
+
+## At a glance
+
+| Area | What it covers |
+| --- | --- |
+| Evidence | Original files, hashes, extracted text and entities |
+| Investigation | Cited checklists, legal lookup and deadline reminders |
+| Review | Money trails, notice approval and case activity records |
+
+## Quick start
 
 Use Docker Compose v2. Ports 5173 and 8000 are bound to loopback.
 
@@ -68,7 +95,7 @@ docker compose --profile model exec -T ollama ollama pull nomic-embed-text
 docker compose exec -T api python /project/scripts/ingest_law.py
 ```
 
-## Verification
+## Testing
 
 ```powershell
 # From backend with the virtual environment available
