@@ -1,0 +1,48 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: investigation
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: investigation
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U investigation"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://investigation:${POSTGRES_PASSWORD}@db:5432/investigation
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      ALLOWED_ORIGIN: http://localhost:5173
+    command: ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+    ports: ["127.0.0.1:8000:8000"]
+
+  web:
+    build:
+      context: frontend
+    depends_on: [api]
+    ports: ["127.0.0.1:5173:80"]
+
+  ollama:
+    image: ollama/ollama:0.13.5
+    profiles: ["model"]
+    volumes:
+      - models:/root/.ollama
+
+volumes:
+  database:
+  models:
