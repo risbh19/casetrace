@@ -1,0 +1,24 @@
+- key: record-fir
+  title: Review the case intake
+  instructions: Check the reported sequence, dates and intake record against the original complaint.
+  legal_basis: [BNSS, "173"]
+  days: 1
+- key: preserve-electronic-evidence
+  title: Preserve the electronic evidence
+  instructions: Keep originals intact and review the custody record and any required certificate.
+  legal_basis: [BSA, "63"]
+  days: 2
+- key: reconcile-bank-records
+  title: Reconcile the transaction records
+  instructions: Match reference numbers and dates, and draft a records request for supervisor review where needed.
+  legal_basis: [BNSS, "94"]
+  days: 3
+- key: document-money-flow
+  title: Review the money trail
+  instructions: Compare transfers and recorded balances. Flag gaps and verify the transaction records.
+  days: 4
+- key: update-informant
+  title: Review the victim progress reminder
+  instructions: Check the deadline anchor and prepare the progress update for officer review.
+  legal_basis: [BNSS, "193(3)(ii)"]
+  days: 90

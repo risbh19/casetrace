@@ -1,0 +1,11 @@
+TRAINING DRAFT · SYNTHETIC CASE
+Case reference: {{ reference }}
+To: {{ recipient }}
+Subject: Review of bank statement request
+
+Purpose: Review the synthetic transfer references and determine which account records would be relevant for a supervisor-reviewed request.
+
+Officer's facts:
+{{ facts }}
+
+Reference for review: BNSS section 94. Confirm scope, authority and the time window before any official use.

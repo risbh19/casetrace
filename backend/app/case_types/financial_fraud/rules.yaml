@@ -1,0 +1,8 @@
+notice_kinds:
+  - bank_statement
+  - bank_freeze
+  - telecom_cdr
+victim_progress_days: 90
+custody_days:
+  other_offence: 60
+  death_life_or_ten_years_or_more: 90

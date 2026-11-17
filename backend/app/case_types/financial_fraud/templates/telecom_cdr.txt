@@ -1,0 +1,11 @@
+TRAINING DRAFT · SYNTHETIC CASE
+Case reference: {{ reference }}
+To: {{ recipient }}
+Subject: Review of telecom records request
+
+Purpose: Document the synthetic call records relevant to the case and check whether a narrowly scoped records request is warranted.
+
+Officer's facts:
+{{ facts }}
+
+Reference for review: BNSS section 94. Confirm applicable permissions and retention rules before any official use.
