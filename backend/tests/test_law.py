@@ -1,5 +1,4 @@
 import pytest
-
 from conftest import bearer_for
 
 GOLDEN = [
