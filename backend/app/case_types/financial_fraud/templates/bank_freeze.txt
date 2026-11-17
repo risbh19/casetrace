@@ -1,0 +1,11 @@
+TRAINING DRAFT · SYNTHETIC CASE
+Case reference: {{ reference }}
+To: {{ recipient }}
+Subject: Review of possible preservation of funds
+
+Purpose: Reconcile the recorded transfer balances and document whether any further preservation steps warrant separate review.
+
+Officer's facts:
+{{ facts }}
+
+Reference for review: BNSS section 106. This training record makes no direction to a bank and places no hold.
