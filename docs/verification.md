@@ -14,10 +14,12 @@ Executed on 23–24 November 2026 with Python 3.12, Node.js 26, Chrome, Docker C
 | Full statutory PDFs | All pages indexed into both SQLite and PostgreSQL: BNSS 249, BNS 102, BSA 54, IT Act 36; total 441. URLs, file hashes and source manifests were retained. |
 | Local models | Real `qwen2.5:0.5b` and the originally documented `qwen2.5:3b` returned suggestions. `nomic-embed-text` produced finite 768-dimensional vectors; 14 curated sections were stored and a PostgreSQL nearest-vector check passed. |
 | Hindi scanned evidence | Both PNG and image-only PDF produced the expected account, amount and date. OCR-inserted account spacing was reproduced and covered by a regression test. |
-| Encrypted recovery | A synthetic PostgreSQL dump was streamed into an AES-GCM archive and authenticated before restoration into a new verification database. Tampered ciphertext is rejected by the regression test. |
+| Encrypted recovery | A synthetic PostgreSQL dump was streamed into an AES-GCM archive and authenticated before restoration into a new verification database. Every row in all 14 tables matched, including original document bytes and audit records. Tampered ciphertext is rejected by the regression test. |
+| Database outage | Health returned 503 while the isolated training database was stopped, and returned 200 after it recovered. |
+| GitHub verification | [PR checks](https://github.com/risbh19/casetrace/actions/runs/45250580289) passed: 27 tests on each database backend with live OCR, four training browser checks and dependency audits. The separate production browser check is opt-in and skipped by ordinary CI. |
 | Recorded demonstration | [Actual synthetic workflow](demo.webm), 3 minutes 1 second, 1280×720; discovery and rehearsal completed before recording. |
 
-The browser checks discovered and fixed the previous Evidence-tab `/evidence` versus API `/documents` mismatch. Clearing optional reminder dates now removes obsolete records. Production requires an officer-confirmed progress-update anchor, blocks simulated sending and refuses known seeded training users/cases at startup.
+The browser checks discovered and fixed the previous Evidence-tab `/evidence` versus API `/documents` mismatch. A repeated production check after midnight in India exposed a UTC-server date mismatch; case-opening validation now uses the same Indian calendar as reminders and the UI, with boundary regression coverage. Clearing optional reminder dates now removes obsolete records. Production requires an officer-confirmed progress-update anchor, blocks simulated sending and refuses known seeded training users/cases at startup.
 
 The 20-question legal set checks expected primary section identifiers. It does not establish legal applicability, amendment coverage or model performance on unseen questions. Full-text results are labeled as original-document search results. The OCR results establish the controlled fixtures, not general handwriting or scan accuracy.
 

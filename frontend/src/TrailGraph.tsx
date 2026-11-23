@@ -37,4 +37,3 @@ export default function TrailGraph({ trail }: { trail: Trail }) {
     {selected && <p role="status">Selected account: {selected}</p>}
   </div>
 }
-

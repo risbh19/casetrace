@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -67,7 +68,7 @@ class CaseCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_opening_date(self):
-        if self.opened_on > date.today():
+        if self.opened_on > datetime.now(ZoneInfo("Asia/Kolkata")).date():
             raise ValueError("Opening date cannot be in the future")
         return self
 
