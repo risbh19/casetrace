@@ -2,13 +2,14 @@ from hashlib import sha256
 from io import BytesIO
 
 import pytest
-from app.models import LawPage
-from app.services.statutes import index_pdf
-from conftest import bearer_for
 from pypdf import PdfWriter
 from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+
+from app.models import LawPage
+from app.services.statutes import index_pdf
+from conftest import bearer_for
 
 
 def statute_pdf():

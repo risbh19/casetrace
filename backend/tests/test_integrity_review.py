@@ -1,10 +1,11 @@
 import pytest
-from app.core.security import passwords
-from app.models import Role, User
-from conftest import bearer_for
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.orm import Session
+
+from app.core.security import passwords
+from app.models import Role, User
+from conftest import bearer_for
 
 
 def upload(client, token, path="/api/cases/1/documents"):

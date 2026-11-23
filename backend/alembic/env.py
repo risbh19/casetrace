@@ -1,4 +1,5 @@
 from alembic import context
+
 from app.core.config import Settings
 from app.core.db import make_engine
 from app.models import Base

@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import pytest
+
 from app.core.config import Settings
 from app.services.extraction import extract
 from app.services.ocr import recognize

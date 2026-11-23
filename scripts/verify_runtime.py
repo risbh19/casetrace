@@ -2,6 +2,9 @@
 
 import argparse
 
+from sqlalchemy import select, type_coerce
+from sqlalchemy.orm import Session
+
 from app.core.config import Settings
 from app.core.db import make_engine
 from app.models import LawSection
@@ -9,8 +12,6 @@ from app.services.extraction import extract
 from app.services.law import ingest
 from app.services.llm import OllamaProvider
 from app.services.ocr import recognize
-from sqlalchemy import select, type_coerce
-from sqlalchemy.orm import Session
 
 
 def main():

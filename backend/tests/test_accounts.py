@@ -1,9 +1,10 @@
 import pytest
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.core.security import passwords, verify_operational_store
 from app.models import Role, User
 from conftest import PASSWORD, bearer_for
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 
 def admin_for(client):

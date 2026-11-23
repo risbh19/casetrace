@@ -1,8 +1,9 @@
+from sqlalchemy.orm import Session
+
 from app.core.config import Settings
 from app.core.db import make_engine
 from app.services.law import ingest
 from app.services.llm import OllamaProvider
-from sqlalchemy.orm import Session
 
 
 def main() -> None:
