@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { api, json } from './api'
-import type { Case, Session } from './api'
+import { ApiError, api, json } from './api'
+import type { Case, Environment, Session } from './api'
+import { OfficerAccounts, PasswordPage } from './Accounts'
+import { Supervision } from './Supervision'
 import { CaseWorkspace, LawLibrary } from './Workspace'
 import { Chip, Empty, ErrorLine, Panel, errorMessage, field, formValues, shortDate, today, useTask } from './ui'
 
-function SignIn({ onSignIn }: { onSignIn: (value: Session) => void }) {
+function SignIn({ onSignIn, environment }: { onSignIn: (value: Session) => void; environment: Environment }) {
   const task = useTask()
   function handleSignIn(event: FormEvent<HTMLFormElement>) {
     const values = formValues(event)
@@ -24,15 +26,15 @@ function SignIn({ onSignIn }: { onSignIn: (value: Session) => void }) {
     <section className="signin-brand">
       <div className="brand-mark" aria-hidden="true">IC</div>
       <span className="signin-eyebrow">FINANCIAL FRAUD INVESTIGATION</span>
-      <h1>Investigation<br />Copilot</h1>
-      <p>One workspace to review evidence, trace synthetic transfers and prepare an officer-reviewed investigation plan.</p>
+      <h1>CaseTrace</h1>
+      <p>One workspace to review evidence, trace recorded transfers and prepare an officer-reviewed investigation plan.</p>
       <div className="signin-trail" aria-hidden="true"><i /><span /><i /><span /><i /><span /><i /></div>
-      <span className="signin-caption">SYNTHETIC TRAINING WORKSPACE</span>
+      <span className="signin-caption">{environment === 'training' ? 'SYNTHETIC TRAINING WORKSPACE' : 'AUTHORIZED INVESTIGATION WORKSPACE'}</span>
     </section>
     <section className="signin-form">
       <form onSubmit={handleSignIn}>
         <h2>Officer sign-in</h2>
-        <p>Use a seeded training account to open the workspace.</p>
+        <p>{environment === 'training' ? 'Use a seeded training account to open the workspace.' : 'Use your individually assigned officer account.'}</p>
         <label>Username<input name="username" autoComplete="username" placeholder="demo.io" required /></label>
         <label>Password<input type="password" name="password" autoComplete="current-password" required /></label>
         <button className="primary" disabled={task.pending}>{task.pending ? 'Signing in…' : 'Sign in'}</button>
@@ -76,7 +78,7 @@ function CaseIndex({ session, selectCase }: { session: Session; selectCase: (ite
         <p>Open an investigation to review evidence, next steps and officer approvals.</p></div>
       {mayCreate && <button className="primary" onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : '+ New case'}</button>}
     </header>
-    {showForm && <Panel title="New training case">
+    {showForm && <Panel title="New case">
       <form className="form-grid" onSubmit={addCase}>
         <label>Case reference<input name="reference" placeholder="DEMO-FIR-025" maxLength={40} required /></label>
         <label>Opened on<input name="opened_on" type="date" defaultValue={today()} max={today()} required /></label>
@@ -113,35 +115,53 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null)
   const [activeCase, setActiveCase] = useState<Case | null>(null)
   const [showLaw, setShowLaw] = useState(false)
+  const [accountView, setAccountView] = useState<'security' | 'officers' | 'supervision' | null>(null)
+  const [config, setConfig] = useState<{ environment: Environment } | null>(null)
+  const task = useTask()
+  useEffect(() => { void task.run(async () => setConfig(await api<{ environment: Environment }>('/config'))) }, [])
 
-  if (!session) return <SignIn onSignIn={setSession} />
+  async function signOut() {
+    if (!session) return
+    try { await api('/auth/logout', session.access_token, { method: 'POST' }) }
+    catch (reason) { if (!(reason instanceof ApiError && reason.status === 401)) throw reason }
+    setSession(null); setActiveCase(null); setShowLaw(false); setAccountView(null)
+  }
+
+  if (!config) return <main><p>Opening CaseTrace…</p><ErrorLine message={task.error} /></main>
+  if (!session) return <SignIn onSignIn={setSession} environment={config.environment} />
+  if (session.officer.must_change_password) return <main className="workspace"><PasswordPage session={session} onSave={setSession} />
+    <button className="secondary" onClick={() => void task.run(signOut)}>Sign out</button><ErrorLine message={task.error} /></main>
   return <div className="app-shell">
     <aside className="sidebar">
-      <div className="brand"><div className="brand-mark" aria-hidden="true">IC</div><span>Investigation<br />Copilot</span></div>
+      <div className="brand"><div className="brand-mark" aria-hidden="true">IC</div><span>CaseTrace</span></div>
       <span className="rail-title">WORKSPACE</span>
       <nav aria-label="Workspace">
-        <button className={showLaw ? '' : 'nav-active'} onClick={() => { setActiveCase(null); setShowLaw(false) }}>
+        <button className={showLaw || accountView ? '' : 'nav-active'} onClick={() => { setActiveCase(null); setShowLaw(false); setAccountView(null) }}>
           <span aria-hidden="true">▤</span> Case register
         </button>
-        <button className={showLaw ? 'nav-active' : ''} onClick={() => setShowLaw(true)}>
+        <button className={showLaw ? 'nav-active' : ''} onClick={() => { setShowLaw(true); setAccountView(null) }}>
           <span aria-hidden="true">≡</span> Legal library
         </button>
+        <button onClick={() => { setAccountView('security'); setShowLaw(false) }}>Account security</button>
+        {session.officer.is_admin && <button onClick={() => { setAccountView('officers'); setShowLaw(false) }}>Officer accounts</button>}
+        {session.officer.role !== 'IO' && <button onClick={() => { setAccountView('supervision'); setShowLaw(false) }}>Supervision</button>}
       </nav>
       <div className="rail-bottom">
         <div className="rail-user"><div className="avatar" aria-hidden="true">{session.officer.name.slice(0, 1)}</div>
           <div><strong>{session.officer.name}</strong><small>{session.officer.role} · {session.officer.station}</small></div>
         </div>
-        <button className="signout" onClick={() => { setSession(null); setActiveCase(null); setShowLaw(false) }}>Sign out</button>
+        <button className="signout" disabled={task.pending} onClick={() => void task.run(signOut)}>Sign out</button>
+        <ErrorLine message={task.error} />
       </div>
     </aside>
     <div className="workspace-shell">
       <header className="topbar">
         <span>{showLaw ? 'Legal library' : activeCase ? 'Case workspace' : 'Case register'}</span>
-        <Chip tone="amber"><span className="status-dot" aria-hidden="true" /> Synthetic training data</Chip>
+        <Chip tone="amber"><span className="status-dot" aria-hidden="true" /> {config.environment === 'training' ? 'Synthetic training data' : 'Restricted officer access'}</Chip>
       </header>
       <main className="workspace">
-        {showLaw ? <LawLibrary token={session.access_token} /> : activeCase
-          ? <CaseWorkspace key={activeCase.id} item={activeCase} session={session} onBack={() => setActiveCase(null)} />
+        {accountView === 'supervision' ? <Supervision session={session} onOpen={item => { setActiveCase(item); setAccountView(null) }} /> : accountView === 'security' ? <PasswordPage session={session} onSave={setSession} /> : accountView === 'officers' ? <OfficerAccounts session={session} /> : showLaw ? <LawLibrary token={session.access_token} /> : activeCase
+          ? <CaseWorkspace key={activeCase.id} item={activeCase} session={session} environment={config.environment} onBack={() => setActiveCase(null)} />
           : <CaseIndex session={session} selectCase={setActiveCase} />}
       </main>
     </div>

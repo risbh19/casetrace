@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -8,6 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str = "sqlite:///./investigation.db"
+    environment: Literal["training", "production"] = "training"
     jwt_secret: str = Field(min_length=32)
     token_minutes: int = Field(default=45, ge=5, le=120)
     corpus_path: Path = Path(__file__).resolve().parents[3] / "data" / "law_corpus" / "sections.json"
@@ -17,6 +19,19 @@ class Settings(BaseSettings):
     ollama_model: str = ""
     embedding_model: str = ""
     allowed_origin: str = "http://localhost:5173"
+
+    @model_validator(mode="after")
+    def production_boundaries(self):
+        from urllib.parse import urlsplit
+
+        origin = urlsplit(self.allowed_origin)
+        if self.environment == "production" and (
+            not self.database_url.startswith("postgresql+") or len(self.jwt_secret) < 48
+            or origin.scheme != "https" or not origin.hostname or origin.username or origin.password
+            or origin.path not in {"", "/"} or origin.query or origin.fragment
+        ):
+            raise ValueError("Production requires PostgreSQL, an independent 48+ character signing secret and an HTTPS origin")
+        return self
 
     @field_validator("ollama_url")
     @classmethod

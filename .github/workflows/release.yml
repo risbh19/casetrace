@@ -1,0 +1,29 @@
+name: Publish verified release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  verify:
+    uses: ./.github/workflows/checks.yml
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const tag = context.ref.replace('refs/tags/', '');
+            if (!/^v\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$/.test(tag)) throw new Error('Invalid release tag');
+            await github.rest.repos.createRelease({
+              owner: context.repo.owner, repo: context.repo.repo,
+              tag_name: tag, target_commitish: context.sha,
+              name: `CaseTrace ${tag}`,
+              body: fs.readFileSync('docs/release-notes.md', 'utf8'),
+              prerelease: tag.includes('-'), draft: false
+            });

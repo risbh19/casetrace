@@ -20,3 +20,9 @@ def test_ambiguous_accounts_require_exact_source_digits():
     assert confirm_ambiguous_accounts(evidence, lambda *_: "1234567890") == [
         ("account", "1234567890", "local-model"),
     ]
+
+
+def test_labeled_accounts_tolerate_ocr_spacing_without_inventing_digits():
+    text = "खाता संखया 900001 2345\naccount 1234 5678 90\naccount 123456 123456 123456 123456"
+    accounts = {value for kind, value, _ in extract(text) if kind == "account"}
+    assert accounts == {"9000012345", "1234567890"}

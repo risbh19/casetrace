@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { api, json, saveOriginal } from './api'
-import type { Answer, AuditEvent, Case, Document, DocumentDetail, Notice, PlanStep, Reminder, Session, Trail } from './api'
+import type { Answer, AuditEvent, Case, Document, DocumentDetail, Environment, Notice, Officer, PlanStep, Reminder, Session, Trail } from './api'
 import { Chip, CitationLink, Empty, ErrorLine, Panel, errorMessage, field, formValues, inr, shortDate, today, useTask } from './ui'
+
+const TrailGraph = lazy(() => import('./TrailGraph'))
 
 function useLoad<T>(path: string, token: string) {
   const [value, setValue] = useState<T | null>(null)
@@ -106,8 +108,9 @@ const noticeTitles: Record<string, string> = {
   bank_statement: 'Bank statement', bank_freeze: 'Funds preservation review', telecom_cdr: 'Telecom records',
 }
 
-function Notices({ path, token, canEdit, session }: CaseProps & { session: Session }) {
+function Notices({ path, token, canEdit, session, environment }: CaseProps & { session: Session; environment: Environment }) {
   const data = useLoad<Notice[]>(path, token)
+  const evidence = useLoad<Document[]>(path.replace('/notices', '/documents'), token)
   const task = useTask()
   const [expanded, setExpanded] = useState<number | null>(null)
   const canReview = session.officer.role !== 'IO'
@@ -138,12 +141,12 @@ function Notices({ path, token, canEdit, session }: CaseProps & { session: Sessi
       <form className="form-grid" onSubmit={createNotice}>
         <label>Notice type<select name="kind">{Object.entries(noticeTitles).map(([key, title]) =>
           <option key={key} value={key}>{title}</option>)}</select></label>
-        <label>Training recipient<input name="recipient" placeholder="Demo Bank" maxLength={120} required /></label>
+        <label>Recipient<input name="recipient" maxLength={120} required /></label>
         <label className="full">Case facts<textarea name="facts" required rows={3} maxLength={1200} /></label>
         <div className="full"><button className="primary" disabled={task.pending}>Save draft</button></div>
       </form>
     </Panel>}
-    <Panel title="Notice register" hint="Delivery for this workspace is simulated.">
+    <Panel title="Notice register" hint={environment === 'training' ? 'Delivery for this workspace is simulated.' : 'Deliver through your authorized external channel, then record its reference and upload proof to this case.'}>
       <ErrorLine message={data.error || task.error} />
       {task.note && <p className="feedback" role="status">{task.note}</p>}
       {!data.value?.length && <Empty>{data.value ? 'No notices drafted.' : 'Loading notices…'}</Empty>}
@@ -155,10 +158,34 @@ function Notices({ path, token, canEdit, session }: CaseProps & { session: Sessi
         </button>
         {expanded === notice.id && <div className="notice-detail">
           <pre className="document-text">{notice.body}</pre>
+          {notice.delivery_reference && <div>
+            <p>Recorded external dispatch: {notice.delivery_channel?.replaceAll('_', ' ')} · {notice.delivery_reference}</p>
+            <button className="secondary" onClick={() => void task.run(() => saveOriginal(
+              `${path.replace('/notices', '/documents')}/${notice.delivery_evidence_id}/original`, token,
+              evidence.value?.find(doc => doc.id === notice.delivery_evidence_id)?.filename || 'dispatch-proof',
+            ))}>Download dispatch proof</button>
+          </div>}
           {canReview && notice.status === 'DRAFT' && notice.created_by !== session.officer.id &&
             <button className="primary" disabled={task.pending} onClick={() => review(notice, 'approve')}>Approve draft</button>}
-          {canReview && notice.status === 'APPROVED' &&
+          {canReview && notice.status === 'APPROVED' && environment === 'training' &&
             <button className="primary" disabled={task.pending} onClick={() => review(notice, 'send')}>Record simulated send</button>}
+          {canReview && notice.status === 'APPROVED' && environment === 'production' && <form className="form-grid" onSubmit={event => {
+            const values = formValues(event)
+            void task.run(async () => {
+              const updated = await api<Notice>(`${path}/${notice.id}/dispatch`, token, json('POST', {
+                channel: field(values, 'channel'), reference: field(values, 'reference'),
+                evidence_document_id: Number(field(values, 'evidence')),
+              }))
+              data.setValue(data.value!.map(item => item.id === updated.id ? updated : item))
+              task.setNote('External dispatch record saved. CaseTrace did not send this notice.')
+            })
+          }}>
+            <label>Dispatch channel<select name="channel"><option value="official_portal">Official portal</option><option value="registered_post">Registered post</option><option value="authorized_email">Authorized email</option><option value="hand_delivery">Hand delivery</option></select></label>
+            <label>External dispatch reference<input name="reference" required maxLength={120} /></label>
+            <label>Evidence of dispatch<select name="evidence" required><option value="">Select uploaded proof</option>{evidence.value?.map(doc => <option value={doc.id} key={doc.id}>{doc.filename}</option>)}</select></label>
+            <button className="primary" disabled={task.pending}>Record external dispatch</button>
+            <ErrorLine message={evidence.error} />
+          </form>}
           {canReview && notice.status === 'DRAFT' && notice.created_by === session.officer.id &&
             <p className="muted">A different supervisor must approve this draft.</p>}
         </div>}
@@ -168,44 +195,7 @@ function Notices({ path, token, canEdit, session }: CaseProps & { session: Sessi
 }
 
 function FlowView({ trail }: { trail: Trail }) {
-  const rows = new Map<number, number>()
-  const positions = new Map(trail.nodes.map(node => {
-    const row = rows.get(node.tier) ?? 0
-    rows.set(node.tier, row + 1)
-    return [node.id, { x: 28 + node.tier * 203, y: 46 + row * 86 }]
-  }))
-  const width = Math.max(400, 90 + rows.size * 203)
-  const height = Math.max(180, 97 + Math.max(...rows.values()) * 86)
-  return <div className="flow-wrap" tabIndex={0} aria-label="Scrollable transaction diagram">
-    <svg role="img" aria-label="Directed graph of synthetic account transfers" viewBox={`0 0 ${width} ${height}`}
-      width={width} height={height}>
-      <defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
-        <path d="M 0 0 L 10 5 L 0 10 z" fill="#8295a3" />
-      </marker></defs>
-      {trail.edges.map(edge => {
-        const a = positions.get(edge.source)!
-        const b = positions.get(edge.target)!
-        const forward = a.x < b.x
-        const start = a.x + (forward ? 124 : 0)
-        const finish = b.x + (forward ? 0 : 124)
-        const bend = forward ? (start + finish) / 2 : Math.min(start, finish) - 26
-        const line = `M${start} ${a.y + 26} C${bend} ${a.y + 26} ${bend} ${b.y + 26} ${finish} ${b.y + 26}`
-        return <path key={`${edge.source}:${edge.target}`} d={line} fill="none" stroke="#8295a3" strokeWidth="1.5" markerEnd="url(#arrow)">
-          <title>{edge.source} to {edge.target}: {inr(edge.amount)}</title>
-        </path>
-      })}
-      {trail.nodes.map(node => {
-        const point = positions.get(node.id)!
-        return <g key={node.id} transform={`translate(${point.x}, ${point.y})`}>
-          <title>{node.id}</title>
-          <rect width="124" height="52" rx="9" fill={node.freeze_priority ? '#fcf1db' : '#ffffff'}
-            stroke={node.freeze_priority ? '#cf9342' : '#cad8db'} />
-          <text x="10" y="22" className="flow-id">{node.id.length > 15 ? node.id.slice(0, 13) + '…' : node.id}</text>
-          <text x="10" y="39" className="flow-label">{node.freeze_priority ? 'Review balance' : 'Account'}</text>
-        </g>
-      })}
-    </svg>
-  </div>
+  return <Suspense fallback={<p>Opening money trail…</p>}><TrailGraph key={JSON.stringify(trail)} trail={trail} /></Suspense>
 }
 
 function MoneyTrail({ path, token, canEdit }: CaseProps) {
@@ -255,13 +245,14 @@ const reminderTitles: Record<string, string> = {
   victim_progress: 'Victim progress update', custody_review: 'Custody limit review', report_target: 'Police report target',
 }
 
-function Deadlines({ path, token, canEdit }: CaseProps) {
+function Deadlines({ path, token, canEdit, environment }: CaseProps & { environment: Environment }) {
   const data = useLoad<Reminder[]>(path, token)
   const task = useTask()
   function calculate(event: FormEvent<HTMLFormElement>) {
     const values = formValues(event)
     void task.run(async () => {
       data.setValue(await api<Reminder[]>(path, token, json('POST', {
+        progress_on: field(values, 'progress_on') || null,
         custody_on: field(values, 'custody_on') || null,
         custody_band: field(values, 'custody_band') || null,
         supervisor_report_due: field(values, 'supervisor_report_due') || null,
@@ -272,6 +263,7 @@ function Deadlines({ path, token, canEdit }: CaseProps) {
   return <div className="stack">
     {canEdit && <Panel title="Set reminders" hint="Enter dates confirmed for the training scenario.">
       <form className="form-grid" onSubmit={calculate}>
+        <label>Confirmed progress-update anchor<input type="date" name="progress_on" max={today()} required={environment === 'production'} /></label>
         <label>Custody date <small>Optional</small><input type="date" name="custody_on" max={today()} /></label>
         <label>Reviewed offence band<select name="custody_band"><option value="">Select if applicable</option>
           <option value="other_offence">Other offence · 60 days</option>
@@ -328,7 +320,7 @@ export function LawLibrary({ token }: { token: string }) {
   const examples = ['When is a victim progress update due?', 'Which section covers bank records?', 'What is required for an electronic record certificate?']
   return <>
     <header className="pagehead"><div><span className="eyebrow">LEGAL REFERENCE</span><h1>Legal library</h1>
-      <p>Find relevant sections in the curated fraud corpus and open the official source.</p></div></header>
+      <p>Search section summaries and indexed official documents, then review the original source.</p></div></header>
     <Panel title="Ask a legal question">
       <form className="inline-form" onSubmit={e => { e.preventDefault(); ask(question) }}>
         <label className="grow">Question<input value={question} onChange={e => setQuestion(e.target.value)}
@@ -339,33 +331,69 @@ export function LawLibrary({ token }: { token: string }) {
         onClick={() => ask(item)}>{item}</button>)}</div>
       <ErrorLine message={task.error} />
     </Panel>
-    {answer && <Panel title={answer.status === 'grounded' ? 'Matching sections' : 'No reliable match'}>
+    {answer && <Panel title={answer.status === 'grounded' ? 'Matching sections' : answer.status === 'retrieved' ? 'Original-text search results' : 'No reliable match'}>
       {answer.citations.length ? <div className="steps">{answer.citations.map(entry =>
         <article key={`${entry.act}:${entry.section}`}>
           <CitationLink item={entry} /><h3>{entry.title}</h3><p>{entry.summary}</p>
         </article>)}</div> : <Empty>{answer.answer}</Empty>}
+      {answer.passages.map(passage => <article key={`${passage.act}:${passage.page}`}>
+        <h3><a href={`${passage.source_url}#page=${passage.page}`} target="_blank" rel="noreferrer">{passage.act} · Original PDF page {passage.page} ↗</a></h3>
+        <pre className="document-text">{passage.text}</pre>
+        <p className="muted">Retrieved {shortDate(passage.retrieved_on)}. Verify amendments, commencement and applicability with the official source.</p>
+        <details><summary>Source integrity</summary><code className="hash">{passage.source_sha256}</code></details>
+      </article>)}
     </Panel>}
   </>
 }
 
 const tabs = [
   ['evidence', 'Evidence'], ['plan', 'Investigation plan'], ['notices', 'Notices'],
-  ['graph', 'Money trail'], ['deadlines', 'Deadlines'], ['audit', 'Activity'],
+  ['graph', 'Money trail'], ['deadlines', 'Deadlines'], ['links', 'Related cases'], ['audit', 'Activity'],
 ] as const
 
-export function CaseWorkspace({ item, session, onBack }: { item: Case; session: Session; onBack: () => void }) {
+function RelatedCases({ path, token }: CaseProps) {
+  const data = useLoad<{ id: number; reference: string; title: string; kind: string; value: string }[]>(path, token)
+  return <Panel title="Related cases" hint="Matching recorded identifiers in cases you are authorized to access. Each possible link requires investigation.">
+    <ErrorLine message={data.error} />
+    {!data.value?.length && <Empty>{data.value ? 'No matching identifiers in your accessible cases.' : 'Checking recorded identifiers…'}</Empty>}
+    {data.value?.map(row => <article key={`${row.id}:${row.kind}:${row.value}`}>
+      <h3>{row.reference} · {row.title}</h3><p>{row.kind}: {row.value}</p>
+    </article>)}
+  </Panel>
+}
+
+function AssignmentForm({ item, token }: { item: Case; token: string }) {
+  const officers = useLoad<Officer[]>('/case-officers', token)
+  const task = useTask()
+  return <form className="inline-form" onSubmit={event => {
+    const values = formValues(event)
+    void task.run(async () => {
+      await api(`/cases/${item.id}/assignment`, token, json('PATCH', { officer_id: Number(field(values, 'officer')) }))
+      task.setNote('Investigating officer assigned. Case access has been updated.')
+    })
+  }}>
+    <label>Investigating officer<select name="officer" defaultValue={String(item.assigned_to)} required>
+      <option value="">Select an officer</option>{officers.value?.map(officer => <option value={officer.id} key={officer.id}>{officer.name}</option>)}
+    </select></label>
+    <button className="secondary" disabled={task.pending || !officers.value?.length}>Assign officer</button>
+    <ErrorLine message={officers.error || task.error} />{task.note && <p role="status">{task.note}</p>}
+  </form>
+}
+
+export function CaseWorkspace({ item, session, environment, onBack }: { item: Case; session: Session; environment: Environment; onBack: () => void }) {
   const [active, setActive] = useState<typeof tabs[number][0]>('evidence')
   const token = session.access_token
   const canEdit = session.officer.role === 'IO' || session.officer.role === 'SHO'
   const root = `/cases/${item.id}`
-  const props = { token, canEdit, path: root + '/' + active }
+  const props = { token, canEdit, path: root + '/' + (active === 'evidence' ? 'documents' : active) }
   return <>
     <button className="back table-link" onClick={onBack}>← Case register</button>
     <header className="case-header">
-      <div className="case-ref"><span className="mono">{item.reference}</span><Chip tone="green">Training case</Chip></div>
+      <div className="case-ref"><span className="mono">{item.reference}</span><Chip tone="green">{environment === 'training' ? 'Training case' : 'Investigation record'}</Chip></div>
       <h1>{item.title}</h1><p>{item.summary}</p>
       <div className="case-meta"><span>Opened <strong>{shortDate(item.opened_on)}</strong></span>
         <span>Unit <strong>{item.station}</strong></span></div>
+      {session.officer.role !== 'IO' && <AssignmentForm item={item} token={token} />}
     </header>
     <nav className="tabs" aria-label="Case sections">
       {tabs.filter(([id]) => id !== 'audit' || session.officer.role !== 'IO').map(([id, title]) =>
@@ -373,9 +401,10 @@ export function CaseWorkspace({ item, session, onBack }: { item: Case; session: 
     </nav>
     {active === 'evidence' && <Evidence {...props} />}
     {active === 'plan' && <InvestigationPlan {...props} />}
-    {active === 'notices' && <Notices {...props} session={session} />}
+    {active === 'notices' && <Notices {...props} session={session} environment={environment} />}
     {active === 'graph' && <MoneyTrail {...props} path={root} />}
-    {active === 'deadlines' && <Deadlines {...props} />}
+    {active === 'deadlines' && <Deadlines {...props} environment={environment} />}
+    {active === 'links' && <RelatedCases {...props} />}
     {active === 'audit' && <Audit {...props} />}
   </>
 }

@@ -29,19 +29,28 @@ def list_deadlines(case: CaseAccess, db: DB):
 @router.post("", response_model=list[DeadlineView])
 def set_deadlines(values: DeadlineInputs, case: CaseAccess, db: DB, user: Officer, request: Request):
     require_roles(user, Role.IO, Role.SHO)
+    if request.app.state.settings.environment == "production" and values.progress_on is None:
+        raise HTTPException(422, "Enter the officer-confirmed progress-update anchor date")
+    if values.progress_on and not case.opened_on <= values.progress_on <= now().astimezone(ZoneInfo("Asia/Kolkata")).date():
+        raise HTTPException(422, "Review the progress anchor against the case date and today")
     if values.custody_on and not case.opened_on <= values.custody_on <= now().astimezone(ZoneInfo("Asia/Kolkata")).date():
         raise HTTPException(422, "Review the custody date against the case opening date and today")
     if values.supervisor_report_due and values.supervisor_report_due < case.opened_on:
         raise HTTPException(422, "Report target cannot precede case opening")
     upper = date(9999, 1, 1)
-    if (values.custody_on and values.custody_on >= upper) or case.opened_on >= upper:
+    if (values.custody_on and values.custody_on >= upper) or (values.progress_on and values.progress_on >= upper) or case.opened_on >= upper:
         raise HTTPException(422, "Date exceeds the supported calculation range")
     lock_case(db, case)
     existing = {row.kind: row for row in list_rows(db, case.id)}
     rules, _ = load_plugin(case.case_type)
-    for values in reminders(
-        case.opened_on, rules, values.custody_on, values.custody_band, values.supervisor_report_due,
-    ):
+    calculated = reminders(
+        case.opened_on, rules, values.custody_on, values.custody_band, values.supervisor_report_due, values.progress_on,
+    )
+    retained = {item["kind"] for item in calculated}
+    for kind, row in existing.items():
+        if kind not in retained:
+            db.delete(row)
+    for values in calculated:
         previous = existing.get(values["kind"])
         if previous:
             if (previous.anchor_date, previous.due_date) != (values["anchor_date"], values["due_date"]):

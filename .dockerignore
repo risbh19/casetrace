@@ -5,3 +5,6 @@
 **/*.db
 **/__pycache__
 .git
+.env.*
+data/law_sources/
+frontend/test-results/

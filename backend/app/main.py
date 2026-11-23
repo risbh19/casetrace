@@ -9,8 +9,9 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.config import Settings
 from app.core.db import make_engine
+from app.core.security import verify_operational_store
 from app.middleware.audit import audit_writes
-from app.routers import cases, deadlines, documents, graph, law, notices, plan
+from app.routers import accounts, cases, deadlines, documents, graph, law, notices, plan, review
 from app.services.llm import OllamaProvider
 
 
@@ -20,13 +21,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
-        yield
-        engine.dispose()
+        try:
+            if options.environment == "production":
+                verify_operational_store(engine)
+            yield
+        finally:
+            engine.dispose()
 
     app = FastAPI(
-        title="Investigation Copilot",
-        description="Synthetic financial-fraud training workspace.",
-        version="0.1.0",
+        title="CaseTrace",
+        description="Officer-reviewed evidence and financial-fraud investigation workspace.",
+        version="1.0.0-rc.1",
         lifespan=lifespan,
     )
     app.state.settings = options
@@ -66,9 +71,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 connection.execute(text("SELECT 1"))
         except SQLAlchemyError:
             return JSONResponse(status_code=503, content={"status": "unavailable"})
-        return {"status": "ok", "mode": "synthetic-demo"}
+        return {"status": "ok", "mode": options.environment}
 
-    for router in (cases, documents, law, plan, notices, graph, deadlines):
+    @app.get("/api/config")
+    def public_config():
+        return {"environment": options.environment, "notice_delivery": "simulated" if options.environment == "training" else "manual_record"}
+
+    for router in (accounts, cases, documents, law, plan, notices, graph, deadlines, review):
         app.include_router(router.router, prefix="/api")
 
     return app
