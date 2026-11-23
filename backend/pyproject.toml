@@ -4,17 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "investigation-copilot"
-version = "0.1.0"
+version = "1.0.0rc1"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.14,<2",
     "argon2-cffi>=23.1,<26",
+    "cryptography>=50,<51",
     "fastapi>=0.121,<1",
     "httpx>=0.28,<1",
     "jinja2>=3.1.6,<4",
     "networkx>=3.4,<4",
     "pgvector>=0.4,<1",
-    "pillow>=11.3,<13",
+    "pillow>=13,<14",
     "psycopg[binary]>=3.2,<4",
     "pydantic-settings>=2.8,<3",
     "pyjwt>=2.10,<3",

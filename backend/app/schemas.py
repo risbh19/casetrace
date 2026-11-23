@@ -30,6 +30,27 @@ class OfficerView(FromDB):
     name: str
     role: Role
     station: str
+    is_active: bool
+    is_admin: bool
+    must_change_password: bool
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=14, max_length=128)
+
+
+class OfficerCreate(BaseModel):
+    username: Reference
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    role: Role
+    temporary_password: str = Field(min_length=14, max_length=128)
+
+
+class OfficerUpdate(BaseModel):
+    is_active: bool | None = None
+    role: Role | None = None
+    temporary_password: str | None = Field(default=None, min_length=14, max_length=128)
 
 
 class LoginView(BaseModel):
@@ -60,6 +81,10 @@ class CaseView(FromDB):
     opened_on: date
     station: str
     assigned_to: int
+
+
+class CaseAssignment(BaseModel):
+    officer_id: int = Field(gt=0)
 
 
 class EntityView(FromDB):
@@ -97,9 +122,19 @@ class LawQuestion(BaseModel):
 
 
 class LawAnswer(BaseModel):
-    status: Literal["grounded", "unsure"]
+    status: Literal["grounded", "retrieved", "unsure"]
     answer: str
     citations: list[Citation]
+    passages: list["LawPassage"] = Field(default_factory=list)
+
+
+class LawPassage(BaseModel):
+    act: str
+    page: int
+    text: str
+    source_url: str
+    source_sha256: str
+    retrieved_on: date
 
 
 class PlanStepView(FromDB):
@@ -132,6 +167,15 @@ class NoticeView(FromDB):
     created_at: datetime
     approved_at: datetime | None
     sent_at: datetime | None
+    delivery_channel: str | None
+    delivery_reference: str | None
+    delivery_evidence_id: int | None
+
+
+class DispatchRecord(BaseModel):
+    channel: Literal["official_portal", "registered_post", "authorized_email", "hand_delivery"]
+    reference: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    evidence_document_id: int = Field(gt=0)
 
 
 class TransactionCreate(BaseModel):
@@ -151,6 +195,7 @@ class TransactionCreate(BaseModel):
 
 
 class DeadlineInputs(BaseModel):
+    progress_on: date | None = None
     custody_on: date | None = None
     custody_band: CustodyBand | None = None
     supervisor_report_due: date | None = None

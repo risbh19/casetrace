@@ -13,7 +13,8 @@ if context.is_offline_mode():
 else:
     engine = make_engine(url)
     with engine.connect() as connection:
-        context.configure(connection=connection, target_metadata=Base.metadata, render_as_batch=True)
+        context.configure(connection=connection, target_metadata=Base.metadata, render_as_batch=True,
+            version_table_schema=config.attributes.get("version_table_schema"))
         with context.begin_transaction():
             context.run_migrations()
     engine.dispose()

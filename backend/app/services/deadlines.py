@@ -4,14 +4,15 @@ from typing import Any
 
 def reminders(
     opened_on: date, rules: dict, custody_on: date | None, custody_band: str | None, supervisor_due: date | None,
+    progress_on: date | None = None,
 ) -> list[dict[str, Any]]:
     result = [
         {
             "kind": "victim_progress",
-            "anchor_date": opened_on,
-            "due_date": opened_on + timedelta(days=rules["victim_progress_days"]),
+            "anchor_date": progress_on or opened_on,
+            "due_date": (progress_on or opened_on) + timedelta(days=rules["victim_progress_days"]),
             "basis": "BNSS 193(3)(ii)",
-            "note": "Demo uses case opening as the progress-update anchor. Confirm the correct date for review.",
+            "note": "Calculation uses the displayed anchor. Confirm its source record and applicable counting rules.",
         }
     ]
     if custody_on is not None and custody_band is not None:

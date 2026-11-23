@@ -1,5 +1,6 @@
 export type Role = 'IO' | 'SHO' | 'CO' | 'SP'
-export type Officer = { id: number; username: string; name: string; role: Role; station: string }
+export type Officer = { id: number; username: string; name: string; role: Role; station: string; is_admin: boolean; is_active: boolean; must_change_password: boolean }
+export type Environment = 'training' | 'production'
 export type Session = { access_token: string; officer: Officer }
 export type Case = {
   id: number; reference: string; title: string; summary: string
@@ -13,7 +14,8 @@ export type DocumentDetail = Document & { text: string; entities: { kind: string
 export type Citation = {
   act: string; section: string; summary: string; title: string; source_url: string; source_page: number | null
 }
-export type Answer = { status: 'grounded' | 'unsure'; answer: string; citations: Citation[] }
+export type Answer = { status: 'grounded' | 'retrieved' | 'unsure'; answer: string; citations: Citation[];
+  passages: { act: string; page: number; text: string; source_url: string; source_sha256: string; retrieved_on: string }[] }
 export type PlanStep = {
   id: number; title: string; instructions: string; due_date: string; status: 'OPEN' | 'DONE'
   legal_basis: Citation | 'unsure'
@@ -21,6 +23,7 @@ export type PlanStep = {
 export type Notice = {
   id: number; kind: string; recipient: string; body: string; created_by: number
   status: 'DRAFT' | 'APPROVED' | 'SENT'; approved_by: number | null
+  delivery_reference: string | null; delivery_channel: string | null; delivery_evidence_id: number | null
 }
 export type Account = { id: string; balance_remaining: string | null; tier: number; freeze_priority: boolean }
 export type Transfer = { source: string; target: string; amount: string; transfers: number }
@@ -48,7 +51,8 @@ async function response(path: string, token?: string, init?: RequestInit) {
 }
 
 export async function api<T>(path: string, token?: string, init?: RequestInit): Promise<T> {
-  return (await response(path, token, init)).json() as Promise<T>
+  const result = await response(path, token, init)
+  return result.status === 204 ? undefined as T : result.json() as Promise<T>
 }
 
 export function json(method: 'POST' | 'PATCH', value: unknown): RequestInit {

@@ -28,6 +28,8 @@ def main() -> None:
     if len(password) < 12:
         raise SystemExit("Set DEMO_PASSWORD to a demo-only value of at least 12 characters.")
     options = Settings()
+    if options.environment != "training":
+        raise SystemExit("Synthetic seed accounts are disabled in production. Use app.manage to provision officers.")
     engine = make_engine(options.database_url)
     synthetic_dir = options.corpus_path.parent.parent / "synthetic"
     if not (synthetic_dir / "fir-01.txt").exists():
@@ -37,7 +39,8 @@ def main() -> None:
         seeded = {row.username: row for row in db.scalars(select(User))}
         for username, name, role, station in DEMO_USERS:
             if username not in seeded:
-                user = User(username=username, name=name, role=role, station=station, password_hash=passwords.hash(password))
+                user = User(username=username, name=name, role=role, station=station, password_hash=passwords.hash(password),
+                    is_admin=username == "demo.sp")
                 seeded[username] = user
                 db.add(user)
         db.flush()

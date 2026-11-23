@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 __pycache__/
 *.py[cod]
@@ -9,3 +11,7 @@ __pycache__/
 node_modules/
 dist/
 coverage/
+data/law_sources/
+test-results/
+playwright-report/
+*.egg-info/

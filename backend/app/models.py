@@ -60,6 +60,27 @@ class User(Base):
     role: Mapped[Role] = mapped_column(Enum(Role, native_enum=False, create_constraint=True))
     station: Mapped[str] = mapped_column(String(40))
     password_hash: Mapped[str] = mapped_column(String(250))
+    is_active: Mapped[bool] = mapped_column(default=True, server_default="true")
+    is_admin: Mapped[bool] = mapped_column(default=False, server_default="false")
+    must_change_password: Mapped[bool] = mapped_column(default=False, server_default="false")
+    session_version: Mapped[int] = mapped_column(default=0, server_default="0")
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    revoked: Mapped[bool] = mapped_column(default=False)
+
+
+class LoginBucket(Base):
+    __tablename__ = "login_buckets"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    window: Mapped[int] = mapped_column(primary_key=True)
+    attempts: Mapped[int] = mapped_column(default=1)
 
 
 class Case(Base):
@@ -119,6 +140,19 @@ class LawSection(Base):
     embedding: Mapped[list[float] | None] = mapped_column(Embedding())
 
 
+class LawPage(Base):
+    __tablename__ = "law_pages"
+    __table_args__ = (UniqueConstraint("act", "page"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    act: Mapped[str] = mapped_column(String(20), index=True)
+    page: Mapped[int]
+    text: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str] = mapped_column(String(400))
+    source_sha256: Mapped[str] = mapped_column(String(64))
+    retrieved_on: Mapped[date] = mapped_column(Date)
+
+
 class PlanStep(Base):
     __tablename__ = "plan_steps"
     __table_args__ = (UniqueConstraint("case_id", "step_key"),)
@@ -149,6 +183,10 @@ class Notice(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    delivery_channel: Mapped[str | None] = mapped_column(String(30))
+    delivery_reference: Mapped[str | None] = mapped_column(String(120))
+    delivery_evidence_id: Mapped[int | None] = mapped_column(ForeignKey("documents.id"))
+    delivery_recorded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
 
 
 class Transaction(Base):

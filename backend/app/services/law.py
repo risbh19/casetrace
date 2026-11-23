@@ -8,6 +8,7 @@ from app.models import LawSection
 from app.schemas import Citation, LawAnswer
 from app.services.llm import LLMProvider
 from app.services.retrieval import requested_sections, score
+from app.services.statutes import search_pages
 
 
 def ingest(db: Session, source: Path, llm: LLMProvider) -> int:
@@ -67,7 +68,11 @@ def ask(db: Session, question: str, llm: LLMProvider) -> LawAnswer:
                 ).first()
                 if nearest is not None and nearest[1] <= 0.25:
                     selected = [nearest[0]]
+    passages = search_pages(db, question)
+    if not selected and passages:
+        return LawAnswer(status="retrieved", answer="Review these original-text search results. They are not a legal conclusion.",
+            citations=[], passages=passages)
     if not selected:
         return LawAnswer(status="unsure", answer="No reliable match in the demo legal corpus.", citations=[])
     citations = [citation(row) for row in selected]
-    return LawAnswer(status="grounded", answer="\n\n".join(c.summary for c in citations), citations=citations)
+    return LawAnswer(status="grounded", answer="\n\n".join(c.summary for c in citations), citations=citations, passages=passages)

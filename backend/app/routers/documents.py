@@ -93,8 +93,12 @@ def inspect_document(document_id: int, case: CaseAccess, db: DB):
 
 
 @router.get("/{document_id}/original")
-def download(document_id: int, case: CaseAccess, db: DB):
+def download(document_id: int, case: CaseAccess, db: DB, request: Request):
     document = document_in_case(db, case.id, document_id)
+    if sha256(document.content).hexdigest() != document.sha256:
+        record(request, db, "evidence.integrity_failed", "document", document.id)
+        raise HTTPException(409, "Evidence integrity check failed. Contact the installation operator.")
+    record(request, db, "evidence.downloaded", "document", document.id)
     return Response(
         document.content, media_type="application/octet-stream",
         headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(document.filename, safe='')}"},

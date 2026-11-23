@@ -1,0 +1,10 @@
+# Use only with a new disposable casetrace-prod-check-* project and synthetic data.
+services:
+  migrate:
+    environment:
+      ALLOWED_ORIGIN: https://localhost:18443
+  api:
+    environment:
+      ALLOWED_ORIGIN: https://localhost:18443
+  gateway:
+    ports: !override ['127.0.0.1:18443:443']

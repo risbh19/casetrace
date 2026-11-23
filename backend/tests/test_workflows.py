@@ -119,3 +119,30 @@ def test_deadlines_separate_progress_custody_and_supervisor_target(client):
     assert current["custody_review"]["due_date"] == "2024-04-30"
     assert not current["custody_review"]["completed"]
     assert client.post(path, headers=io, json={"custody_on": "2024-01-31"}).status_code == 422
+
+
+def test_clearing_optional_dates_removes_stale_reminders(client):
+    io = bearer_for(client, "io")
+    path = ROOT + "/deadlines"
+    first = client.post(path, headers=io, json={
+        "custody_on": "2024-01-31", "custody_band": "other_offence",
+        "supervisor_report_due": "2024-05-02",
+    }).json()
+    assert len(first) == 3
+    cleared = client.post(path, headers=io, json={
+        "custody_on": None, "custody_band": None, "supervisor_report_due": None,
+    })
+    assert cleared.status_code == 200
+    assert [row["kind"] for row in cleared.json()] == ["victim_progress"]
+    assert client.get(path, headers=io).json() == cleared.json()
+
+
+def test_production_requires_confirmed_progress_anchor(client):
+    io = bearer_for(client, "io")
+    client.app.state.settings.environment = "production"
+    path = ROOT + "/deadlines"
+    assert client.post(path, headers=io, json={}).status_code == 422
+    result = client.post(path, headers=io, json={"progress_on": "2024-02-01"})
+    assert result.status_code == 200
+    assert result.json()[0]["anchor_date"] == "2024-02-01"
+    assert result.json()[0]["due_date"] == "2024-05-01"

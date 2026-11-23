@@ -5,7 +5,7 @@ from decimal import Decimal
 PATTERNS = {
     "phone": r"(?<![\w.])(?:\+91[ -]?)?([6-9]\d{4}[ -]?\d{5})(?!\w)",
     "ifsc": r"\b([A-Z]{4}0[A-Z0-9]{6})\b",
-    "account": r"(?:account(?:\s*(?:no\.?|number|id))?|a/c|खाता(?:\s*संख्या)?)\s*[:#-]?\s*(\d{9,18})(?!\d)",
+    "account": r"(?:account(?:\s*(?:no\.?|number|id))?|a/c|खाता(?:\s*(?:संख्या|संखया))?)\s*[:#-]?\s*(\d{2,6}(?:[ -]\d{2,6}){1,5}|\d{9,18})(?!\d)",
     "upi": r"(?<![\w@.-])([A-Za-z0-9][A-Za-z0-9._-]{1,63}@[A-Za-z][A-Za-z0-9]{1,39})\b(?!\.[A-Za-z0-9])",
     "amount": r"(?:₹|INR\b|Rs\.?\s|रुपये\s*)\s*(\d[\d,]{0,22}(?:\.\d{1,2})?)(?![\d.,])",
     "date": r"\b(\d{4}-\d{2}-\d{2}|\d{2}/\d{2}/\d{4})\b",
@@ -26,6 +26,10 @@ def extract(text: str) -> list[tuple[str, str, str]]:
                 if match.span(1) in account_spans:
                     continue
                 raw = re.sub(r"\D", "", raw)
+            elif kind == "account":
+                raw = re.sub(r"\D", "", raw)
+                if not 9 <= len(raw) <= 18:
+                    continue
             elif kind == "amount":
                 raw = f"{Decimal(raw.replace(',', '')):.2f}"
             elif kind == "date":
